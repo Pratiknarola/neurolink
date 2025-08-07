@@ -15,15 +15,32 @@ import type { UnknownRecord } from "../types/common.js";
 export async function getBestProvider(
   requestedProvider?: string,
 ): Promise<string> {
-  // 🔧 FIX: Check for explicit default provider in env
+  // Check requested provider FIRST - explicit user choice overrides defaults
+  if (requestedProvider && requestedProvider !== "auto") {
+    if (await isProviderAvailable(requestedProvider)) {
+      logger.debug(
+        `[getBestProvider] Using requested provider: ${requestedProvider}`,
+      );
+      return requestedProvider;
+    } else {
+      logger.warn(
+        `[getBestProvider] Requested provider '${requestedProvider}' is not available. Falling back to auto-selection.`,
+      );
+    }
+  }
+
+  // Check for explicit default provider in env (only when no provider requested)
   if (
     process.env.DEFAULT_PROVIDER &&
     (await isProviderAvailable(process.env.DEFAULT_PROVIDER))
   ) {
+    logger.debug(
+      `[getBestProvider] Using default provider from env: ${process.env.DEFAULT_PROVIDER}`,
+    );
     return process.env.DEFAULT_PROVIDER;
   }
 
-  // 🔧 FIX: Special case for Ollama - prioritize local when available
+  // Special case for Ollama - prioritize local when available
   if (process.env.OLLAMA_BASE_URL && process.env.OLLAMA_MODEL) {
     try {
       if (await isProviderAvailable("ollama")) {
@@ -46,19 +63,6 @@ export async function getBestProvider(
     "bedrock",
     "ollama", // Keep as fallback
   ];
-
-  if (requestedProvider && requestedProvider !== "auto") {
-    if (await isProviderAvailable(requestedProvider)) {
-      logger.debug(
-        `[getBestProvider] Using requested provider: ${requestedProvider}`,
-      );
-      return requestedProvider;
-    } else {
-      logger.warn(
-        `[getBestProvider] Requested provider '${requestedProvider}' is not available. Falling back to auto-selection.`,
-      );
-    }
-  }
 
   for (const provider of providers) {
     if (await isProviderAvailable(provider)) {

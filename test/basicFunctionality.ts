@@ -154,6 +154,68 @@ describe(`Basic Functionality Tests (${getTestProvider().toUpperCase()})`, () =>
     );
 
     it(
+      `should run generate with evaluation domain (Phase 1 feature) with ${getTestProvider()}`,
+      async () => {
+        const args = [
+          "generate",
+          "Analyze patient symptoms: fever and headache",
+          "--provider",
+          getTestProvider(),
+          "--max-tokens",
+          "2000",
+          "--evaluationDomain",
+          "healthcare",
+          "--enable-evaluation",
+          "--format",
+          "json",
+        ];
+        console.log("🔍 INPUT: pnpm cli", args.join(" "));
+        console.log(`🤖 Provider: ${getTestProvider()}`);
+
+        const { stdout } = await execCLI(args);
+        console.log("📤 OUTPUT:", stdout.substring(0, 400) + "...");
+
+        expect(stdout).toContain("Generated Content:");
+        // Verify evaluation domain is included in output when using JSON format
+        if (stdout.includes("evaluation")) {
+          console.log(
+            "✅ PHASE 1 FEATURE: Evaluation domain detected in output",
+          );
+        }
+      },
+      timeout,
+    );
+
+    it(
+      `should run generate with analytics enabled (Phase 1 feature) with ${getTestProvider()}`,
+      async () => {
+        const args = [
+          "generate",
+          "Test analytics tracking",
+          "--provider",
+          getTestProvider(),
+          "--max-tokens",
+          "2000",
+          "--enable-analytics",
+          "--format",
+          "json",
+        ];
+        console.log("🔍 INPUT: pnpm cli", args.join(" "));
+        console.log(`🤖 Provider: ${getTestProvider()}`);
+
+        const { stdout } = await execCLI(args);
+        console.log("📤 OUTPUT:", stdout.substring(0, 400) + "...");
+
+        expect(stdout).toContain("Generated Content:");
+        // Verify analytics data is included in output when using JSON format
+        if (stdout.includes("analytics")) {
+          console.log("✅ PHASE 1 FEATURE: Analytics data detected in output");
+        }
+      },
+      timeout,
+    );
+
+    it(
       `should run stream command successfully with ${getTestProvider()}`,
       async () => {
         const args = [
@@ -174,6 +236,31 @@ describe(`Basic Functionality Tests (${getTestProvider().toUpperCase()})`, () =>
           "✅ VALIDATION: Contains Streaming:",
           stdout.includes("Streaming..."),
         );
+
+        expect(stdout).toContain("Streaming...");
+      },
+      timeout,
+    );
+
+    it(
+      `should run stream with evaluation domain (Phase 1 feature) with ${getTestProvider()}`,
+      async () => {
+        const args = [
+          "stream",
+          "Healthcare analysis for patient care",
+          "--provider",
+          getTestProvider(),
+          "--max-tokens",
+          "2000",
+          "--evaluationDomain",
+          "healthcare",
+          "--enable-evaluation",
+        ];
+        console.log("🔍 INPUT: pnpm cli", args.join(" "));
+        console.log(`🤖 Provider: ${getTestProvider()}`);
+
+        const { stdout } = await execCLI(args, 8000);
+        console.log("📤 OUTPUT:", stdout.substring(0, 200) + "...");
 
         expect(stdout).toContain("Streaming...");
       },

@@ -38,7 +38,7 @@ export interface BaseContext {
 /**
  * Context integration mode types
  */
-export type ContextIntegrationMode =
+type ContextIntegrationMode =
   | "prompt_prefix" // Add context as prompt prefix
   | "prompt_suffix" // Add context as prompt suffix
   | "system_prompt" // Include context in system prompt
@@ -61,7 +61,7 @@ export interface ContextConfig {
 /**
  * Context processing result
  */
-export interface ProcessedContext {
+interface ProcessedContext {
   originalContext: BaseContext;
   processedContext: string | null;
   config: ContextConfig;
@@ -290,14 +290,150 @@ export class ContextFactory {
 /**
  * Type guard to check if value is valid context
  */
-export function isValidContext(value: unknown): value is BaseContext {
+function isValidContext(value: unknown): value is BaseContext {
   return ContextFactory.validateContext(value) !== null;
 }
 
 /**
- * Context integration options for AI generation
+ * Context conversion utilities for domain-specific data
+ * Replaces hardcoded business context with generic domain context
  */
-export interface ContextIntegrationOptions {
-  context?: BaseContext;
-  contextConfig?: Partial<ContextConfig>;
+
+import type { ExecutionContext } from "../mcp/contracts/mcpContract.js";
+
+interface ContextConversionOptions {
+  preserveLegacyFields?: boolean;
+  validateDomainData?: boolean;
+  includeMetadata?: boolean;
+}
+
+export class ContextConverter {
+  /**
+   * Convert legacy business context to generic domain context
+   * Based on business context patterns
+   */
+  static convertBusinessContext(
+    legacyContext: Record<string, unknown>,
+    domainType: string,
+    options: ContextConversionOptions = {},
+  ): ExecutionContext {
+    const {
+      preserveLegacyFields = false,
+      validateDomainData = true,
+      includeMetadata = true,
+    } = options;
+
+    return {
+      sessionId: legacyContext.sessionId as string,
+      userId: legacyContext.userId as string,
+      config: {
+        domainType,
+        providerConfig: {
+          token:
+            legacyContext.apiToken ||
+            legacyContext.authToken ||
+            legacyContext.accessToken,
+          endpoint: legacyContext.apiEndpoint || legacyContext.serviceUrl,
+          provider: this.inferProvider(legacyContext),
+        },
+        platformConfig: {
+          type: legacyContext.platformType || "generic",
+          url: legacyContext.platformUrl || legacyContext.serviceUrl,
+          id: legacyContext.platformId || legacyContext.serviceId,
+          integrations: legacyContext.platformIntegrations || [],
+        },
+        operationalConfig: {
+          demoMode: legacyContext.enableDemoMode || false,
+          environment: legacyContext.environment || "production",
+          region: legacyContext.region,
+          features: legacyContext.enabledFeatures || [],
+        },
+        customData: {
+          // Preserve domain-specific fields if needed
+          ...(preserveLegacyFields
+            ? {
+                entityId: legacyContext.entityId || legacyContext.organizationId,
+                departmentId: legacyContext.departmentId,
+                projectId: legacyContext.projectId,
+              }
+            : {}),
+          // Include any additional custom data
+          ...this.extractCustomData(legacyContext),
+        },
+      },
+      metadata: includeMetadata
+        ? {
+            convertedFrom: "legacy-business-context",
+            conversionTime: Date.now(),
+            originalKeys: Object.keys(legacyContext),
+            domainType,
+          }
+        : undefined,
+    };
+  }
+
+  /**
+   * Create execution context for any domain
+   */
+  static createDomainContext(
+    domainType: string,
+    domainData: Record<string, unknown>,
+    sessionInfo: { sessionId?: string; userId?: string } = {},
+  ): ExecutionContext {
+    return {
+      sessionId: sessionInfo.sessionId || `session_${Date.now()}`,
+      userId: sessionInfo.userId,
+      config: {
+        domainType,
+        customData: domainData,
+      },
+      metadata: {
+        source: "domain-context-factory",
+        createdAt: Date.now(),
+        domainType,
+      },
+    };
+  }
+
+  private static inferProvider(context: Record<string, unknown>): string {
+    // Generic provider inference based on context structure
+    if (context.apiToken || context.authToken) {
+      return "api-provider";
+    }
+    if (context.serviceUrl || context.endpoint) {
+      return "service-provider";
+    }
+    return "generic-provider";
+  }
+
+  private static extractCustomData(
+    context: Record<string, unknown>,
+  ): Record<string, unknown> {
+    // Generic field extraction - only exclude common framework fields
+    const frameworkFields = new Set([
+      "sessionId",
+      "userId",
+      "apiToken",
+      "authToken",
+      "apiEndpoint",
+      "serviceUrl",
+      "endpoint",
+      "environment",
+      "region",
+      "enabledFeatures",
+      "platformType",
+      "platformUrl",
+      "platformId",
+      "enableDemoMode",
+    ]);
+
+    const customData: Record<string, unknown> = {};
+    Object.entries(context).forEach(([key, value]) => {
+      if (!frameworkFields.has(key)) {
+        customData[key] = value;
+      }
+    });
+
+    return customData;
+  }
 }

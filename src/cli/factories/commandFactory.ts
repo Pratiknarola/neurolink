@@ -1,7 +1,7 @@
 import type { CommandModule, Argv } from "yargs";
 import { NeuroLink } from "../../lib/neurolink.js";
 import type { AIProviderName } from "../../lib/index.js";
-import type { UnknownRecord } from "../../lib/types/common.js";
+import type { UnknownRecord, JsonValue } from "../../lib/types/common.js";
 import type {
   BaseCommandArgs,
   GenerateCommandArgs,
@@ -62,6 +62,7 @@ interface CLICommandArgs extends BaseCommandArgs {
   context?: Record<string, unknown>;
   noColor?: boolean;
   configFile?: string;
+  dryRun?: boolean;
   [key: string]: unknown;
 }
 
@@ -164,10 +165,10 @@ export class CLICommandFactory {
       description:
         "Tool usage context for evaluation (e.g., 'Used sales-data MCP tools')",
     },
-    lighthouseStyle: {
+    domainAware: {
       type: "boolean" as const,
       default: false,
-      description: "Use Lighthouse-compatible domain-aware evaluation",
+      description: "Use domain-aware evaluation",
     },
     context: {
       type: "string" as const,
@@ -195,6 +196,11 @@ export class CLICommandFactory {
     configFile: {
       type: "string" as const,
       description: "Path to custom configuration file",
+    },
+    dryRun: {
+      type: "boolean" as const,
+      default: false,
+      description: "Test command without making actual API calls (for testing)",
     },
   };
 
@@ -266,7 +272,7 @@ export class CLICommandFactory {
       enableEvaluation: argv.enableEvaluation,
       evaluationDomain: argv.evaluationDomain,
       toolUsageContext: argv.toolUsageContext,
-      lighthouseStyle: argv.lighthouseStyle,
+      domainAware: argv.domainAware,
       context: processedContext,
       contextConfig,
       debug: argv.debug,
@@ -276,6 +282,7 @@ export class CLICommandFactory {
       delay: argv.delay,
       noColor: argv.noColor,
       configFile: argv.configFile,
+      dryRun: argv.dryRun,
     };
   }
 
@@ -685,6 +692,62 @@ export class CLICommandFactory {
       : ora("🔍 Checking AI provider status...\n").start();
 
     try {
+      // Handle dry-run mode for provider status
+      if (argv.dryRun) {
+        const mockResults = [
+          {
+            provider: "google-ai",
+            status: "working",
+            configured: true,
+            responseTime: 150,
+            model: "gemini-2.5-flash",
+          },
+          {
+            provider: "openai",
+            status: "working",
+            configured: true,
+            responseTime: 200,
+            model: "gpt-4o-mini",
+          },
+          {
+            provider: "anthropic",
+            status: "working",
+            configured: true,
+            responseTime: 180,
+            model: "claude-3-haiku",
+          },
+          { provider: "bedrock", status: "not configured", configured: false },
+          { provider: "vertex", status: "not configured", configured: false },
+        ];
+
+        if (spinner) {
+          spinner.succeed(
+            "Provider check complete (dry-run): 3/3 providers working",
+          );
+        }
+
+        // Display mock results
+        for (const result of mockResults) {
+          const status =
+            result.status === "working"
+              ? chalk.green("✅ Working")
+              : result.status === "failed"
+                ? chalk.red("❌ Failed")
+                : chalk.gray("⚪ Not configured");
+
+          const time = result.responseTime ? ` (${result.responseTime}ms)` : "";
+          const model = result.model ? ` [${result.model}]` : "";
+          logger.always(`${result.provider}: ${status}${time}${model}`);
+        }
+
+        if (argv.verbose && !argv.quiet) {
+          logger.always(chalk.blue("\n📋 Detailed Results (Dry-run):"));
+          logger.always(JSON.stringify(mockResults, null, 2));
+        }
+
+        return;
+      }
+
       // Use SDK's provider diagnostic method instead of manual testing
       const sdk = new NeuroLink();
       const results = await sdk.getProviderStatus({ quiet: !!argv.quiet });
@@ -787,6 +850,60 @@ export class CLICommandFactory {
             processingTime: processedContextResult.metadata.processingTime,
           });
         }
+      }
+
+      // Handle dry-run mode for testing
+      if (options.dryRun) {
+        const mockResult = {
+          content: "Mock response for testing purposes",
+          provider: options.provider || "auto",
+          model: options.model || "test-model",
+          usage: {
+            inputTokens: 10,
+            outputTokens: 15,
+            totalTokens: 25,
+          },
+          responseTime: 150,
+          analytics: options.enableAnalytics
+            ? {
+                provider: options.provider || "auto",
+                model: options.model || "test-model",
+                tokens: { input: 10, output: 15, total: 25 },
+                cost: 0.00025,
+                responseTime: 150,
+                context: contextMetadata,
+              }
+            : undefined,
+          evaluation: options.enableEvaluation
+            ? {
+                relevance: 8,
+                accuracy: 9,
+                completeness: 8,
+                overall: 8.3,
+                isOffTopic: false,
+                alertSeverity: "none" as const,
+                reasoning: "Test evaluation response",
+                evaluationModel: "test-evaluator",
+                evaluationTime: 50,
+              }
+            : undefined,
+        };
+
+        if (spinner) {
+          spinner.succeed(chalk.green("✅ Dry-run completed successfully!"));
+        }
+
+        this.handleOutput(mockResult, options);
+
+        if (options.debug) {
+          logger.debug("\n" + chalk.yellow("Debug Information (Dry-run):"));
+          logger.debug("Provider:", mockResult.provider);
+          logger.debug("Model:", mockResult.model);
+          logger.debug("Mode: DRY-RUN (no actual API calls made)");
+        }
+
+        process.exit(0);
+        return;
       }
 
       const sdk = new NeuroLink();
@@ -905,6 +1022,90 @@ export class CLICommandFactory {
             processingTime: processedContextResult.metadata.processingTime,
           });
         }
+      }
+
+      // Handle dry-run mode for testing
+      if (options.dryRun) {
+        if (!options.quiet) {
+          logger.always(chalk.blue("🔄 Dry-run streaming..."));
+        }
+
+        // Simulate streaming output
+        const chunks = [
+          "Mock ",
+          "streaming ",
+          "response ",
+          "for ",
+          "testing ",
+          "purposes",
+        ];
+        let fullContent = "";
+
+        for (const chunk of chunks) {
+          process.stdout.write(chunk);
+          fullContent += chunk;
+          await new Promise((resolve) => setTimeout(resolve, 50)); // Simulate streaming delay
+        }
+
+        if (!options.quiet) {
+          process.stdout.write("\n");
+        }
+
+        // Mock analytics and evaluation for dry-run
+        if (options.enableAnalytics) {
+          const mockAnalytics: AnalyticsData = {
+            provider: options.provider || "auto",
+            model: options.model || "test-model",
+            requestDuration: 300,
+            tokenUsage: {
+              inputTokens: 10,
+              outputTokens: 15,
+              totalTokens: 25,
+            },
+            timestamp: Date.now(),
+            context: contextMetadata as JsonValue,
+          };
+
+          const mockGenerateResult: GenerateResult = {
+            success: true,
+            content: fullContent,
+            analytics: mockAnalytics,
+            model: mockAnalytics.model,
+            toolsUsed: [],
+          };
+
+          const analyticsDisplay =
+            this.formatAnalyticsForTextMode(mockGenerateResult);
+          logger.always(analyticsDisplay);
+        }
+
+        if (options.enableEvaluation) {
+          logger.always(chalk.blue("\n📊 Response Evaluation (Dry-run):"));
+          logger.always(`   Relevance: 8/10`);
+          logger.always(`   Accuracy: 9/10`);
+          logger.always(`   Completeness: 8/10`);
+          logger.always(`   Overall: 8.3/10`);
+          logger.always(`   Reasoning: Test evaluation response`);
+        }
+
+        if (options.output) {
+          fs.writeFileSync(options.output, fullContent);
+          if (!options.quiet) {
+            logger.always(`\nOutput saved to ${options.output}`);
+          }
+        }
+
+        if (options.debug) {
+          logger.debug(
+            "\n" + chalk.yellow("Debug Information (Dry-run Streaming):"),
+          );
+          logger.debug("Provider:", options.provider || "auto");
+          logger.debug("Model:", options.model || "test-model");
+          logger.debug("Mode: DRY-RUN (no actual API calls made)");
+        }
+
+        process.exit(0);
+        return;
       }
 
       const sdk = new NeuroLink();
@@ -1069,6 +1270,19 @@ export class CLICommandFactory {
         }
 
         try {
+          // Handle dry-run mode for batch processing
+          if (options.dryRun) {
+            results.push({
+              prompt: prompts[i],
+              response: `Mock batch response ${i + 1} for testing purposes`,
+            });
+
+            if (spinner) {
+              spinner.render();
+            }
+            continue;
+          }
+
           // Process context for each batch item
           let inputText = prompts[i];
           let contextMetadata: UnknownRecord | undefined;
