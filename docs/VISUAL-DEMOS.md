@@ -170,7 +170,7 @@ asciinema play docs/cli-recordings/latest/06-advanced-features.cast
 
 **Real external server integration demonstrations**
 
-#### **Server Management** - [🎬 MP4](../neurolink-demo/videos/mcp-demos/mcp-server-management-demo.mp4)
+#### **Server Management** - [🎬 MP4](videos/mcp-server-management-demo.mp4)
 
 - Installing and configuring MCP servers
 - Server lifecycle management

@@ -1577,12 +1577,12 @@ await neurolink.addInMemoryMCPServer("server-id", {
 
 ## 📚 Additional Resources
 
-- [API Reference - NeuroLink Class](./API-REFERENCE.md#neurolink-class-api)
-- [MCP Integration Guide](./MCP-INTEGRATION.md)
+- [API Reference - NeuroLink Class](../API-REFERENCE.md#neurolink-class-api)
+- [MCP Integration Guide](../MCP-INTEGRATION.md)
 - [Provider Tool Support](../index.md#provider-tool-support-status)
 - [Test Examples](../test/mcp/toolIntegration/)
-- [MCP SDK Integration Proof Tests](../test/mcp-sdk-integration-proof.test.ts)
-- [Real AI-MCP Integration Demo](../test/mcp-ai-integration-demo.test.ts)
+- MCP SDK Integration Proof Tests (see codebase for examples)
+- Real AI-MCP Integration Demo (see codebase for examples)
 
 ---
 
